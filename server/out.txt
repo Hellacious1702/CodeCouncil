@@ -1,0 +1,11 @@
+﻿[dotenv@17.3.1] injecting env (4) from .env -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+Server running on port 5000
+node : Error: bad auth : authentication failed
+At line:1 char:1
++ node server.js 2>&1 | Out-File -FilePath out.txt -Encoding 
+utf8
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error: bad auth :  
+   authentication failed:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
