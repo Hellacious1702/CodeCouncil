@@ -22,8 +22,8 @@ const Navbar = () => {
       
       <div className="flex items-center gap-8 text-sm uppercase tracking-widest text-on-surface-variant font-medium">
         <Link to="/dashboard" className="hover:text-primary transition-colors duration-200">Arena</Link>
+        <Link to="/history" className="hover:text-primary transition-colors duration-200">History</Link>
         <a href="#" className="hover:text-primary transition-colors duration-200">Intelligence</a>
-        <a href="#" className="hover:text-primary transition-colors duration-200">Protocol</a>
         
         {user ? (
           <div className="flex items-center gap-4 ml-4 pl-4 border-l border-outline-variant/30">

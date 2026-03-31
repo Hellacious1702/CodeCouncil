@@ -50,3 +50,45 @@ exports.reviewCode = async (req, res, next) => {
         next(error);
     }
 };
+
+// Get all reviews for the current user
+exports.getReviews = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ success: false, message: 'Authentication required for history' });
+        }
+
+        const reviews = await CodeReview.find({ user: req.user._id }).sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: reviews.length,
+            data: reviews
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get single review by ID
+exports.getReviewById = async (req, res, next) => {
+    try {
+        const review = await CodeReview.findById(req.params.id);
+
+        if (!review) {
+            return res.status(404).json({ success: false, message: 'Review not found' });
+        }
+
+        // Check ownership
+        if (review.user && review.user.toString() !== req.user._id.toString()) {
+            return res.status(401).json({ success: false, message: 'Not authorized to view this review' });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: review
+        });
+    } catch (error) {
+        next(error);
+    }
+};

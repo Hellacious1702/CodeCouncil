@@ -6,7 +6,7 @@ const CodeEditor = ({ value, onChange, editable = true }) => {
   }, [onChange]);
 
   return (
-    <div className={`relative h-full overflow-y-auto ${!editable ? 'opacity-60 pointer-events-none' : ''}`}>
+    <div className={`relative h-full overflow-y-auto ${!editable ? 'opacity-80' : ''}`}>
       <textarea
         value={value}
         onChange={handleChange}

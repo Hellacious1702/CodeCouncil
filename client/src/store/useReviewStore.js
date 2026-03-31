@@ -6,14 +6,29 @@ const API_URL = 'http://localhost:5000/api';
 // Review Store - MAS AI state machine
 export const useReviewStore = create((set, get) => ({
   status: 'IDLE', // IDLE -> ANALYZING -> RESOLVING -> COMPLETE -> ERROR
-  code: '// Enter JavaScript to review\nfunction example() {\n  return "Hello MAS!";\n}',
+  code: '// Enter code to review\nfunction example() {\n  return "Hello MAS!";\n}',
+  language: 'javascript',
   results: null,
   error: null,
+  isResolved: false,
 
-  setCode: (code) => set({ code }),
+  setLanguage: (language) => set({ language }),
+
+  setCode: (code) => {
+    const { status } = get();
+    // Auto-reset if user starts typing after review is complete or while resolving/failing
+    if (status !== 'IDLE' && status !== 'ANALYZING') {
+      set({ code, status: 'IDLE', results: null, error: null, isResolved: false });
+    } else {
+      set({ code });
+    }
+  },
+
+  markResolved: (val) => set({ isResolved: val }),
 
   submitForReview: async () => {
-    set({ status: 'ANALYZING', error: null, results: null });
+    const { code, language } = get();
+    set({ status: 'ANALYZING', error: null, results: null, isResolved: false });
 
     try {
       // Grab JWT token if the user is authenticated
@@ -22,7 +37,7 @@ export const useReviewStore = create((set, get) => ({
 
       const res = await axios.post(
         `${API_URL}/ai/review`,
-        { code: get().code, language: 'javascript' },
+        { code, language },
         { headers }
       );
 
@@ -32,6 +47,7 @@ export const useReviewStore = create((set, get) => ({
       set({
         status: 'RESOLVING',
         results: {
+          id: data._id,
           securityAudit: data.auditorOutput,
           performanceAudit: data.optimizerOutput,
           judgeResolution: data.judgeResolution,
@@ -57,5 +73,5 @@ export const useReviewStore = create((set, get) => ({
     }
   },
 
-  reset: () => set({ status: 'IDLE', results: null, error: null })
+  reset: () => set({ status: 'IDLE', results: null, error: null, isResolved: false })
 }));

@@ -85,7 +85,7 @@ const Signup = () => {
             <input
               type="password"
               value={confirmPassword}
-              onChange={(e) => { setConfirmPassword(e.target.value); setLocalError(''); }}
+              onChange={(e) => { setConfirmPassword(e.target.value); clearError(); setLocalError(''); }}
               required
               className="w-full bg-surface-container-lowest border-b-2 border-outline-variant/50 focus:border-secondary px-4 py-3 text-on-surface font-mono text-sm outline-none transition-colors duration-300"
               placeholder="Re-enter access key"
