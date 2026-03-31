@@ -1,7 +1,26 @@
 const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const modelName = 'gemini-2.5-flash'; // Google GenAI recommended model, or we can use gemini-3.1-pro if available
+const modelName = 'gemini-2.5-flash';
+
+// Retry wrapper for transient Gemini 503/429 errors
+const callWithRetry = async (fn, retries = 3, delay = 2000) => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await fn();
+        } catch (err) {
+            const status = err?.status || err?.httpStatusCode || err?.code;
+            const isRetryable = [503, 429, 'UNAVAILABLE', 'RESOURCE_EXHAUSTED'].includes(status);
+            
+            if (isRetryable && i < retries - 1) {
+                console.log(`[Gemini] Retrying in ${delay}ms (attempt ${i + 2}/${retries})...`);
+                await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+            } else {
+                throw err;
+            }
+        }
+    }
+};
 
 // Agent A: Hostile Security Auditor
 exports.runSecurityAuditor = async (code, language) => {
@@ -10,11 +29,13 @@ exports.runSecurityAuditor = async (code, language) => {
 Code:
 ${code}`;
     
-    const response = await ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
+    return callWithRetry(async () => {
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+        });
+        return response.text;
     });
-    return response.text;
 };
 
 // Agent B: Ruthless Performance Optimizer
@@ -24,11 +45,13 @@ exports.runPerformanceOptimizer = async (code, language) => {
 Code:
 ${code}`;
     
-    const response = await ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
+    return callWithRetry(async () => {
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+        });
+        return response.text;
     });
-    return response.text;
 };
 
 // Agent C: The Judge
@@ -58,10 +81,11 @@ Output your response strictly in the following JSON structure without markdown f
   "judgeResolution": "The synthesized final code..."
 }`;
     
-    const response = await ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
+    return callWithRetry(async () => {
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+        });
+        return response.text;
     });
-    
-    return response.text;
 };
