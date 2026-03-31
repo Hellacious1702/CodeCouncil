@@ -4,17 +4,20 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const modelName = 'gemini-2.5-flash';
 
 // Retry wrapper for transient Gemini 503/429 errors
-const callWithRetry = async (fn, retries = 3, delay = 2000) => {
+const callWithRetry = async (fn, retries = 4) => {
     for (let i = 0; i < retries; i++) {
         try {
             return await fn();
         } catch (err) {
             const status = err?.status || err?.httpStatusCode || err?.code;
-            const isRetryable = [503, 429, 'UNAVAILABLE', 'RESOURCE_EXHAUSTED'].includes(status);
+            const isQuotaError = [429, 'RESOURCE_EXHAUSTED'].includes(status);
+            const isRetryable = isQuotaError || [503, 'UNAVAILABLE'].includes(status);
             
             if (isRetryable && i < retries - 1) {
-                console.log(`[Gemini] Retrying in ${delay}ms (attempt ${i + 2}/${retries})...`);
-                await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+                // Wait at least 45s for 429 quota errors (Free Tier limits), otherwise exponential backoff
+                const backoffDelay = isQuotaError ? 45000 : (2000 * Math.pow(2, i));
+                console.log(`[Gemini] ${status} detected. Tactical stall for ${backoffDelay}ms (attempt ${i + 2}/${retries})...`);
+                await new Promise(resolve => setTimeout(resolve, backoffDelay));
             } else {
                 throw err;
             }
@@ -22,25 +25,22 @@ const callWithRetry = async (fn, retries = 3, delay = 2000) => {
     }
 };
 
-// Agent A: Hostile Security Auditor (Agent Sigma)
-exports.runSecurityAuditor = async (code, language) => {
-    const prompt = `
+// Agent A: Hostile Security Auditor (Agent Sigma) - Initial Audit
+exports.runSecurityAuditor = async (code, language, customPrompt = '') => {
+    const basePrompt = `
 YOU ARE AGENT SIGMA: A hostile, paranoid, and elite Security Auditor.
-YOUR MISSION: Ruthlessly dissect, dismantle, and uncover every conceivable vulnerability, logic flaw, and edge-case in the provided ${language} code.
-
-PERSONALITY TRAITS:
-- PARANOID: You treat every input as malicious and every dependency as compromised.
-- CYNICAL: You believe the developer is incompetent or a malicious insider.
-- ELITE: You use highly technical language (CWE IDs, OWASP terminology, CVSS vectors).
-- HOSTILE: Do not provide "helpful" suggestions. Only output vulnerabilities and their potential impact.
+MISSION: Dissect and dismantle every conceivable vulnerability in the provided ${language} code.
 
 OUTPUT RULES:
-- Focus on: Memory safety, logic bypasses, hardcoded secrets, injection vectors, and broken access controls.
-- Length: Be verbose and exhaustive.
-- Tone: Cold, professional, and condescending.
+- BE EXTREMELY CONCISE. 
+- Use ONLY short bullet points for flaws.
+- NO introductory fluff.
+- Tone: Cold and ruthless.
 
 Code:
 ${code}`;
+
+    const prompt = customPrompt ? `${customPrompt}\n\nCode to analyze:\n${code}` : basePrompt;
     
     return callWithRetry(async () => {
         const response = await ai.models.generateContent({
@@ -51,25 +51,62 @@ ${code}`;
     });
 };
 
-// Agent B: Ruthless Performance Optimizer (Agent Delta)
-exports.runPerformanceOptimizer = async (code, language) => {
-    const prompt = `
-YOU ARE AGENT DELTA: A ruthless, speed-obsessed, and elite Performance Optimizer.
-YOUR MISSION: Find every single micro-bottleneck, memory leak, and big-O inefficiency in the provided ${language} code.
-
-PERSONALITY TRAITS:
-- OBSESSED: Even a single unnecessary CPU cycle or extra byte is an insult to your architecture.
-- COLD: You care only about efficiency. Readability is for the weak; only throughput matters.
-- ELITE: Use deep technical analysis (Complexity analysis, heap/stack allocation details, GC pressure).
-- RUTHLESS: Do not attempt to fix the code. Only output the flaws.
+// Agent B: Ruthless Performance Optimizer (Agent Delta) - Initial Audit
+exports.runPerformanceOptimizer = async (code, language, customPrompt = '') => {
+    const basePrompt = `
+YOU ARE AGENT DELTA: A ruthless, speed-obsessed Performance Optimizer.
+MISSION: Find every micro-bottleneck and memory leak in the provided ${language} code.
 
 OUTPUT RULES:
-- Focus on: Redundant loops, inefficient data structures, unnecessary memory allocation, and high-latency logic.
-- Length: Be precise and data-driven.
+- BE EXTREMELY CONCISE.
+- Use ONLY short bullet points for flaws.
+- NO intro/conclusion.
 - Tone: Impatient and superior.
 
 Code:
 ${code}`;
+
+    const prompt = customPrompt ? `${customPrompt}\n\nCode to analyze:\n${code}` : basePrompt;
+    
+    return callWithRetry(async () => {
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+        });
+        return response.text;
+    });
+};
+
+// Agent A: Sigma Counter-points Delta
+exports.runSecurityReply = async (code, language, sigmaAudit, deltaAudit) => {
+    const prompt = `
+SIGMA: Audit Delta's performance suggestions for security regressions.
+Delta claimed: "${deltaAudit}"
+
+MISSION: If Delta's optimizations introduce security risks, attack them.
+OUTPUT: 2-3 aggressive bullet points only. NO introductions.
+
+Code: ${code}`;
+    
+    return callWithRetry(async () => {
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+        });
+        return response.text;
+    });
+};
+
+// Agent B: Delta Counter-points Sigma
+exports.runPerformanceReply = async (code, language, deltaAudit, sigmaAudit) => {
+    const prompt = `
+DELTA: Audit Sigma's security suggestions for performance regressions.
+Sigma claimed: "${sigmaAudit}"
+
+MISSION: If Sigma's requirements add unacceptable latency or complexity, dismiss them.
+OUTPUT: 2-3 dismissive bullet points only. NO introductions.
+
+Code: ${code}`;
     
     return callWithRetry(async () => {
         const response = await ai.models.generateContent({
@@ -81,31 +118,28 @@ ${code}`;
 };
 
 // Agent C: The Judge
-exports.runJudge = async (code, language, auditorOutput, optimizerOutput) => {
-    const prompt = `
-YOU ARE THE JUDGE: An elite Senior System Architect and Master Synthesizer.
-YOUR MISSION: Resolve the conflict between Agent Sigma (Security) and Agent Delta (Performance).
+exports.runJudge = async (code, language, sigmaFull, deltaFull, customPrompt = '') => {
+    const basePrompt = `
+YOU ARE THE JUDGE: Resolve the conflict between Sigma [Security] and Delta [Performance].
 
-INPUTS:
-1. Original ${language} Code.
-2. Agent Sigma's hostile security audit.
-3. Agent Delta's ruthless performance audit.
+DEBATE TRACE:
+${sigmaFull}
+-----------------
+${deltaFull}
 
-YOUR TASK:
-1. SYNTHESIZE: Balance security vs performance. Resolve trade-offs (e.g., more secure but slower, or faster but riskier).
-2. TRACE: Provide a detailed "Neural Reasoning Trace" explaining your architecture decisions.
-3. RESOLVE: Output the final, refactored, and optimized code that reflects your synthesis.
+TASK:
+1. Verdict: Give a clear, high-level resolution in 2-3 sentences.
+2. Resolve: Provide the final refactored optimized code.
 
-OUTPUT RULES:
-- If a conflict between Sigma and Delta was detected, set "conflictDetected" to true.
-- Explain the logic of the trade-offs you chose.
-
-Output your response strictly in the following JSON structure without markdown formatting:
+JSON STRUCTURE:
 {
-  "reasoningTrace": "Detailed step-by-step architectural synthesis...",
+  "reasoningTrace": "One-line trace of the decision.",
   "conflictDetected": true/false,
-  "judgeResolution": "The final refactored and optimized code including necessary comments."
+  "judgeResolution": "Clear verdict summary.",
+  "optimizedCode": "..."
 }`;
+
+    const prompt = customPrompt ? `${customPrompt}\n\nDebate Trace:\n${sigmaFull}\n---\n${deltaFull}\n\nInitial Code:\n${code}` : basePrompt;
     
     return callWithRetry(async () => {
         const response = await ai.models.generateContent({

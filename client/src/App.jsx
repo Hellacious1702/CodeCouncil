@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import History from './pages/History';
+import Analytics from './pages/Analytics';
 import { useAuthStore } from './store/useAuthStore';
 
 // Protected Route wrapper
@@ -33,6 +34,11 @@ function App() {
             <Route path="/history" element={
               <ProtectedRoute>
                 <History />
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <Analytics />
               </ProtectedRoute>
             } />
           </Routes>

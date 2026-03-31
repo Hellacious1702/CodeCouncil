@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import { useSettingsStore } from './useSettingsStore';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5050/api';
 
 // Review Store - MAS AI state machine
 export const useReviewStore = create((set, get) => ({
@@ -11,6 +12,10 @@ export const useReviewStore = create((set, get) => ({
   results: null,
   error: null,
   isResolved: false,
+  focusData: { isOpen: false, type: null, content: null, provider: null },
+
+  setFocusData: (data) => set({ focusData: { ...data, isOpen: true } }),
+  closeFocus: () => set((state) => ({ focusData: { ...state.focusData, isOpen: false } })),
 
   setLanguage: (language) => set({ language }),
 
@@ -26,8 +31,9 @@ export const useReviewStore = create((set, get) => ({
 
   markResolved: (val) => set({ isResolved: val }),
 
-  submitForReview: async () => {
+  submitReview: async () => {
     const { code, language } = get();
+    const { customSigmaPrompt, customDeltaPrompt, customJudgePrompt, neuralProvider } = useSettingsStore.getState();
     set({ status: 'ANALYZING', error: null, results: null, isResolved: false });
 
     try {
@@ -37,7 +43,14 @@ export const useReviewStore = create((set, get) => ({
 
       const res = await axios.post(
         `${API_URL}/ai/review`,
-        { code, language },
+        { 
+          code, 
+          language,
+          provider: neuralProvider,
+          customSigmaPrompt,
+          customDeltaPrompt,
+          customJudgePrompt 
+        },
         { headers }
       );
 
@@ -48,12 +61,13 @@ export const useReviewStore = create((set, get) => ({
         status: 'RESOLVING',
         results: {
           id: data._id,
-          securityAudit: data.auditorOutput,
-          performanceAudit: data.optimizerOutput,
+          auditorOutput: data.auditorOutput,
+          optimizerOutput: data.optimizerOutput,
           judgeResolution: data.judgeResolution,
           reasoningTrace: data.reasoningTrace,
-          optimizedCode: data.judgeResolution,
+          optimizedCode: data.optimizedCode || data.judgeResolution,
           conflictDetected: data.conflictDetected,
+          provider: data.provider
         }
       });
 
@@ -75,3 +89,5 @@ export const useReviewStore = create((set, get) => ({
 
   reset: () => set({ status: 'IDLE', results: null, error: null, isResolved: false })
 }));
+
+export default useReviewStore;

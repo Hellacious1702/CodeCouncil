@@ -26,6 +26,10 @@ const codeReviewSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    optimizedCode: {
+        type: String,
+        required: false
+    },
     reasoningTrace: {
         type: String,
         required: true
@@ -33,6 +37,10 @@ const codeReviewSchema = new mongoose.Schema({
     conflictDetected: {
         type: Boolean,
         default: false
+    },
+    provider: {
+        type: String,
+        default: 'gemini'
     }
 }, { timestamps: true });
 

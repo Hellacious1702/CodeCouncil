@@ -1,45 +1,79 @@
 const geminiService = require('../services/geminiService');
+const groqService = require('../services/groqService');
+const rulesEngineService = require('../services/rulesEngineService');
 const CodeReview = require('../models/CodeReview');
 
 exports.reviewCode = async (req, res, next) => {
     try {
-        const { code, language } = req.body;
+        const { code, language, provider = 'gemini', customSigmaPrompt, customDeltaPrompt, customJudgePrompt } = req.body;
+        const lang = language || 'javascript';
         
         if (!code) {
             return res.status(400).json({ success: false, message: 'Code snippet is required' });
         }
 
-        // Concurrent execution of Auditor and Optimizer (Cognitive Friction)
-        const [auditorOutput, optimizerOutput] = await Promise.all([
-            geminiService.runSecurityAuditor(code, language || 'javascript'),
-            geminiService.runPerformanceOptimizer(code, language || 'javascript')
+        // PROVIDER FACTORY: SELECT NEURAL CORE
+        let service;
+        switch (provider) {
+            case 'groq':
+                service = groqService;
+                break;
+            case 'local':
+                service = rulesEngineService;
+                break;
+            case 'gemini':
+            default:
+                service = geminiService;
+        }
+
+        console.log(`[MAS] Initiating Review via [${provider.toUpperCase()}] Provider...`);
+
+        // STEP 1: INITIAL PASS (Parallel)
+        console.log(`[MAS] Tasking Sigma & Delta Agents...`);
+        const [sigmaInitial, deltaInitial] = await Promise.all([
+            service.runSecurityAuditor(code, lang, customSigmaPrompt),
+            service.runPerformanceOptimizer(code, lang, customDeltaPrompt)
         ]);
 
-        // Sequential execution of The Judge
-        const rawJudgeOutput = await geminiService.runJudge(code, language || 'javascript', auditorOutput, optimizerOutput);
+        // STEP 2: COUNTER-POINTS (Parallel)
+        console.log(`[MAS] Initiating Adversarial Contextualization...`);
+        const [sigmaCounter, deltaCounter] = await Promise.all([
+            service.runSecurityReply(code, lang, sigmaInitial, deltaInitial),
+            service.runPerformanceReply(code, lang, deltaInitial, sigmaInitial)
+        ]);
+
+        // Full Traces for the Judge
+        const sigmaFull = `INITIAL_AUDIT:\n${sigmaInitial}\n\nREACTION_TO_DELTA:\n${sigmaCounter}`;
+        const deltaFull = `INITIAL_AUDIT:\n${deltaInitial}\n\nREACTION_TO_SIGMA:\n${deltaCounter}`;
+
+        // STEP 3: ARBITRATION
+        console.log(`[MAS] Initiating Judicial Settlement...`);
+        const rawJudgeOutput = await service.runJudge(code, lang, sigmaFull, deltaFull, customJudgePrompt);
         
         let judgeParsed;
         try {
-            judgeParsed = JSON.parse(rawJudgeOutput);
+            judgeParsed = typeof rawJudgeOutput === 'object' ? rawJudgeOutput : JSON.parse(rawJudgeOutput);
         } catch (e) {
-            // Fallback if the AI fails to return strictly JSON
             judgeParsed = {
                 reasoningTrace: rawJudgeOutput,
-                conflictDetected: false,
-                judgeResolution: "Failed to parse Judge's strict JSON output. Please see reasoning trace."
+                conflictDetected: true,
+                judgeResolution: "Neural synthesis parsed as text due to format variance.",
+                optimizedCode: code 
             };
         }
 
         // Save to Database
         const review = await CodeReview.create({
-            user: req.user ? req.user._id : null, // Handle both authenticated and anonymous
+            user: req.user ? req.user._id : null,
             originalCode: code,
-            language: language || 'javascript',
-            auditorOutput,
-            optimizerOutput,
+            language: lang,
+            auditorOutput: sigmaFull,
+            optimizerOutput: deltaFull,
             judgeResolution: judgeParsed.judgeResolution,
+            optimizedCode: judgeParsed.optimizedCode || code,
             reasoningTrace: judgeParsed.reasoningTrace,
-            conflictDetected: judgeParsed.conflictDetected || false
+            conflictDetected: judgeParsed.conflictDetected || false,
+            provider // Track which provider was used
         });
 
         res.status(201).json({
@@ -47,6 +81,7 @@ exports.reviewCode = async (req, res, next) => {
             data: review
         });
     } catch (error) {
+        console.error(`[MAS] Internal Protocol Error:`, error);
         next(error);
     }
 };

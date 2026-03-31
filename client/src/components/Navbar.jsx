@@ -20,9 +20,10 @@ const Navbar = () => {
         </Link>
       </div>
       
-      <div className="flex items-center gap-8 text-sm uppercase tracking-widest text-on-surface-variant font-medium">
+      <div className="flex items-center gap-8 text-sm uppercase tracking-[0.2em] text-on-surface-variant font-medium">
         <Link to="/dashboard" className="hover:text-primary transition-colors duration-200">Arena</Link>
         <Link to="/history" className="hover:text-primary transition-colors duration-200">History</Link>
+        <Link to="/analytics" className="hover:text-primary transition-colors duration-200">Analytics</Link>
         <a href="#" className="hover:text-primary transition-colors duration-200">Intelligence</a>
         
         {user ? (

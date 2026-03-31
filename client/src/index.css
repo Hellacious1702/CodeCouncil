@@ -68,3 +68,42 @@
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
+
+/* CUSTOM MONOLITH SCROLLBARS */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 251, 251, 0.4);
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 251, 251, 0.8);
+  box-shadow: 0 0 15px rgba(0, 251, 251, 0.6);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 251, 251, 0.4) transparent;
+}
+
+.cc-panel-scroll {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* Panel Containers - Hardening */
+.cc-quadrant-fixed {
+  height: 100%;
+  max-height: calc(50vh - 100px);
+  display: flex;
+  flex-direction: column;
+}
