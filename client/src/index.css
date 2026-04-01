@@ -103,7 +103,19 @@
 /* Panel Containers - Hardening */
 .cc-quadrant-fixed {
   height: 100%;
-  max-height: calc(50vh - 100px);
   display: flex;
   flex-direction: column;
+}
+
+@media (min-width: 1024px) {
+  .cc-quadrant-fixed {
+    max-height: calc(50vh - 58px); /* 100vh - 116px (header + gap) / 2 */
+  }
+}
+
+@media (max-width: 1023px) {
+  .cc-quadrant-fixed {
+    min-height: 400px;
+    height: 50vh;
+  }
 }

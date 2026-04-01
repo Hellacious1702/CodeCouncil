@@ -93,7 +93,7 @@ const Dashboard = () => {
       </div>
 
       {/* FIXED 4-QUADRANT GRID */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 grid-rows-2 gap-px bg-outline-variant/10 h-[calc(100vh-120px)] overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 grid-rows-4 lg:grid-rows-2 gap-px bg-outline-variant/10 overflow-y-auto lg:overflow-hidden">
         
         {/* Block 1: CORE ARCHITECT (Editor) */}
         <div className="cc-quadrant-fixed bg-surface-container-low/40 relative">

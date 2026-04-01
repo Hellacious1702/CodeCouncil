@@ -196,6 +196,10 @@ async def analyze_code(request: AnalyzeRequest):
         )
         
     except Exception as e:
+        import traceback
+        with open("error.txt", "w") as f:
+            f.write(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 

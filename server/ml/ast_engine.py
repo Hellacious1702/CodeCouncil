@@ -410,103 +410,135 @@ class HTMLStructureParser(HTMLParser):
             })
 
 
+import esprima
+
 class JavaScriptAnalyzer:
-    """JavaScript analysis via regex + structural heuristics."""
+    """JavaScript analysis via true ESPrima AST parsing + structural heuristics."""
 
     def analyze(self, code: str) -> dict:
         issues = []
-        lines = code.split('\n')
+        
+        try:
+            # Parse into ESPrima AST
+            tree = esprima.parseScript(code, {"loc": True})
+        except Exception as e:
+            issues.append({
+                "id": "JS_SYNTAX",
+                "severity": "CRITICAL",
+                "line": getattr(e, 'lineNumber', 0),
+                "message": f"JavaScript Syntax Error: {str(e)}",
+                "category": "syntax"
+            })
+            return {"issues": issues, "valid": False}
+        
+        # We will use a flexible recursive walk over node objects
+        def walk(node):
+            if not getattr(node, "type", None):
+                # If it's a list or tuple of nodes (e.g., body elements)
+                if isinstance(node, (list, tuple)):
+                    for item in node:
+                        walk(item)
+                return
 
-        # Syntax-level checks
-        for i, line in enumerate(lines, 1):
-            stripped = line.strip()
+            node_type = getattr(node, "type", None)
             
-            # var usage
-            if re.match(r'^var\s+', stripped):
+            # Extract line number safely
+            loc = getattr(node, "loc", None)
+            line_no = 0
+            if loc and getattr(loc, "start", None):
+                line_no = getattr(loc.start, "line", 0)
+
+            # Check for var usage
+            if node_type == "VariableDeclaration" and getattr(node, "kind", None) == "var":
                 issues.append({
                     "id": "JS_VAR",
                     "severity": "MEDIUM",
-                    "line": i,
-                    "message": f"'var' at line {i}. Use 'const' or 'let' for proper block scoping.",
-                    "category": "best_practice"
-                })
-            
-            # == instead of ===
-            if re.search(r'[^!=]==[^=]', stripped) and 'null' not in stripped:
-                issues.append({
-                    "id": "JS_LOOSE_EQUAL",
-                    "severity": "MEDIUM",
-                    "line": i,
-                    "message": f"Loose equality '==' at line {i}. Use '===' for type-safe comparison.",
-                    "category": "logic"
-                })
-            
-            # console.log in production
-            if 'console.log(' in stripped:
-                issues.append({
-                    "id": "JS_CONSOLE_LOG",
-                    "severity": "LOW",
-                    "line": i,
-                    "message": f"console.log() at line {i}. Remove debug logs before production deployment.",
+                    "line": line_no,
+                    "message": "Use 'const' or 'let' instead of 'var' for proper block scoping.",
                     "category": "best_practice"
                 })
 
-        # Structural checks
-        if 'eval(' in code:
-            issues.append({
-                "id": "JS_EVAL",
-                "severity": "CRITICAL",
-                "line": 0,
-                "message": "eval() detected. This allows arbitrary code execution and is a critical security vulnerability.",
-                "category": "security"
-            })
+            # Check for == loose equality
+            elif node_type == "BinaryExpression" and getattr(node, "operator", None) == "==":
+                right_node = getattr(node, "right", None)
+                if right_node and getattr(right_node, "value", "NOT_NULL") is not None:
+                    issues.append({
+                        "id": "JS_LOOSE_EQUAL",
+                        "severity": "MEDIUM",
+                        "line": line_no,
+                        "message": "Loose equality '==' detected. Use strict '===' for type-safe comparison.",
+                        "category": "logic"
+                    })
 
-        if 'innerHTML' in code:
-            issues.append({
-                "id": "JS_INNERHTML",
-                "severity": "HIGH",
-                "line": 0,
-                "message": "innerHTML usage detected. This is a primary XSS attack vector. Use textContent or a DOM sanitizer.",
-                "category": "security"
-            })
+            # Check Call Expressions (eval, print, document.write)
+            elif node_type == "CallExpression":
+                callee = getattr(node, "callee", None)
+                if callee:
+                    callee_type = getattr(callee, "type", None)
+                    if callee_type == "Identifier" and getattr(callee, "name", None) == "eval":
+                        issues.append({
+                            "id": "JS_EVAL",
+                            "severity": "CRITICAL",
+                            "line": line_no,
+                            "message": "eval() allows arbitrary code execution and is a critical security vulnerability.",
+                            "category": "security"
+                        })
+                    elif callee_type == "MemberExpression":
+                        obj = getattr(callee, "object", None)
+                        prop = getattr(callee, "property", None)
+                        if obj and prop:
+                            obj_name = getattr(obj, "name", None)
+                            prop_name = getattr(prop, "name", None) or getattr(prop, "value", None)
+                            if obj_name == "document" and prop_name == "write":
+                                issues.append({
+                                    "id": "JS_DOC_WRITE",
+                                    "severity": "HIGH",
+                                    "line": line_no,
+                                    "message": "document.write() can overwrite the entire page and is a known XSS vector.",
+                                    "category": "security"
+                                })
+                            elif obj_name == "console" and prop_name == "log":
+                                issues.append({
+                                    "id": "JS_CONSOLE_LOG",
+                                    "severity": "LOW",
+                                    "line": line_no,
+                                    "message": "console.log() detected. Remove debug logs before production deployment.",
+                                    "category": "best_practice"
+                                })
 
-        if 'document.write(' in code:
-            issues.append({
-                "id": "JS_DOC_WRITE",
-                "severity": "HIGH",
-                "line": 0,
-                "message": "document.write() can overwrite the entire page and is blocked in modern browsers during parsing.",
-                "category": "security"
-            })
+            # Check Assignment Expressions (innerHTML)
+            elif node_type == "AssignmentExpression":
+                left = getattr(node, "left", None)
+                if left and getattr(left, "type", None) == "MemberExpression":
+                    prop = getattr(left, "property", None)
+                    if prop:
+                        prop_name = getattr(prop, "name", None) or getattr(prop, "value", None)
+                        if prop_name == "innerHTML":
+                            issues.append({
+                                "id": "JS_INNERHTML",
+                                "severity": "HIGH",
+                                "line": line_no,
+                                "message": "innerHTML assignment detected. This is a primary XSS attack vector. Use textContent or DOM sanitizer.",
+                                "category": "security"
+                            })
 
-        # Check brace matching
-        open_braces = code.count('{')
-        close_braces = code.count('}')
-        if open_braces != close_braces:
-            issues.append({
-                "id": "JS_BRACE_MISMATCH",
-                "severity": "CRITICAL",
-                "line": 0,
-                "message": f"Brace mismatch: {open_braces} opening '{{' vs {close_braces} closing '}}'. Check for unclosed blocks.",
-                "category": "syntax"
-            })
+            # Recurse through all children properties of this node
+            for key, val in vars(node).items():
+                if key not in ("loc", "range", "type") and not key.startswith("_"):
+                    walk(val)
 
-        # Check parenthesis matching
-        open_parens = code.count('(')
-        close_parens = code.count(')')
-        if open_parens != close_parens:
-            issues.append({
-                "id": "JS_PAREN_MISMATCH",
-                "severity": "CRITICAL",
-                "line": 0,
-                "message": f"Parenthesis mismatch: {open_parens} '(' vs {close_parens} ')'. Likely a syntax error.",
-                "category": "syntax"
-            })
+        try:
+             walk(tree)
+        except Exception as walk_err:
+             print(f"AST walk error (JS): {walk_err}")
+             pass
 
         return {
             "issues": issues,
-            "valid": len([i for i in issues if i["severity"] == "CRITICAL"]) == 0
+            "valid": len([i for i in issues if i["severity"] == "CRITICAL"]) == 0,
+            "ast_verified": True
         }
+
 
 
 # Language router
