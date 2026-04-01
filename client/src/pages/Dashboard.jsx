@@ -34,14 +34,14 @@ const Dashboard = () => {
     <div className="flex-1 flex flex-col pt-16 min-h-screen bg-surface overflow-hidden font-sans">
       
       {/* MONOLITH HEADER PROTOCOL */}
-      <div className="h-14 border-b border-outline-variant/30 flex items-center justify-between px-6 bg-surface-container-low/90 backdrop-blur-md z-20">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 group cursor-pointer">
-            <Monitor size={14} className="text-primary-container" />
+      <div className="h-14 border-b border-outline-variant/30 flex items-center justify-between px-2 md:px-6 bg-surface-container-low/90 backdrop-blur-md z-20 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 md:gap-6 shrink-0">
+          <div className="flex items-center gap-1 md:gap-2 group cursor-pointer">
+            <Monitor size={12} className="md:w-[14px] md:h-[14px] text-primary-container" />
             <select 
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="bg-transparent text-[10px] font-mono uppercase tracking-[0.2em] text-primary outline-none cursor-pointer hover:text-primary-container transition-colors"
+              className="bg-transparent text-[9px] md:text-[10px] font-mono uppercase tracking-[0.1em] md:tracking-[0.2em] text-primary outline-none cursor-pointer hover:text-primary-container transition-colors"
             >
               {languages.map(lang => (
                 <option key={lang} value={lang} className="bg-surface-container-highest text-on-surface">{lang}</option>
@@ -49,45 +49,45 @@ const Dashboard = () => {
             </select>
           </div>
 
-          <div className="h-4 w-px bg-outline-variant/20" />
+          <div className="h-4 w-px bg-outline-variant/20 mx-1 md:mx-0" />
 
           {/* Neural Status Stream */}
-          <div className="flex items-center gap-4 text-[9px] font-mono text-outline uppercase tracking-[0.25em]">
+          <div className="flex items-center gap-2 md:gap-4 text-[8px] md:text-[9px] font-mono text-outline uppercase tracking-[0.1em] md:tracking-[0.25em]">
             <span className={status === 'IDLE' ? 'text-primary' : ''}>Idle</span>
-            <span className="opacity-20">{'>>'}</span>
-            <span className={isAnalyzing ? 'text-secondary animate-pulse' : ''}>Neural_Stream</span>
-            <span className="opacity-20">{'>>'}</span>
-            <span className={status === 'COMPLETE' ? 'text-primary-container' : ''}>Synthesis_Ready</span>
+            <span className="opacity-20 hidden md:inline">{'>>'}</span>
+            <span className={`hidden md:inline ${isAnalyzing ? 'text-secondary animate-pulse' : ''}`}>Neural_Stream</span>
+            <span className="opacity-20 hidden md:inline">{'>>'}</span>
+            <span className={`hidden md:inline ${status === 'COMPLETE' ? 'text-primary-container' : ''}`}>Synthesis_Ready</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4 ml-auto pl-2 shrink-0">
           <button 
             onClick={handleEngage}
             disabled={isAnalyzing}
             className={`
-              flex items-center gap-2 px-6 py-1.5 border border-primary-container/40 bg-primary-container/5
-              text-primary-container uppercase tracking-widest text-[10px] font-bold hover:bg-primary-container hover:text-surface
-              transition-all duration-500 disabled:opacity-40 disabled:cursor-not-allowed
+              flex items-center gap-1.5 md:gap-2 px-3 md:px-6 py-1 md:py-1.5 border border-primary-container/40 bg-primary-container/5
+              text-primary-container uppercase tracking-wider md:tracking-widest text-[9px] md:text-[10px] font-bold hover:bg-primary-container hover:text-surface
+              transition-all duration-500 disabled:opacity-40 disabled:cursor-not-allowed shrink-0
               ${isAnalyzing ? 'glow-cyan' : ''}
             `}
           >
             <Play size={10} fill="currentColor" className={isAnalyzing ? 'animate-spin' : ''} />
-            {isAnalyzing ? 'Neural Processing...' : 'Engage Engine'}
+            {isAnalyzing ? <span className="hidden md:inline">Processing...</span> : <><span className="md:hidden">Run</span><span className="hidden md:inline">Engage Engine</span></>}
           </button>
 
           <button 
             onClick={reset}
-            className="p-1.5 text-outline hover:text-primary transition-colors border border-transparent hover:border-outline-variant/30 rounded"
+            className="p-1.5 text-outline hover:text-primary transition-colors border border-transparent hover:border-outline-variant/30 rounded shrink-0"
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={14} className="md:w-[16px] md:h-[16px]" />
           </button>
 
           <button 
             onClick={() => setIsSettingsOpen(true)}
-            className="p-1.5 text-outline hover:text-secondary transition-colors border border-transparent hover:border-outline-variant/30 rounded"
+            className="p-1.5 text-outline hover:text-secondary transition-colors border border-transparent hover:border-outline-variant/30 rounded shrink-0"
           >
-            <Settings size={14} />
+            <Settings size={14} className="md:w-[16px] md:h-[16px]" />
           </button>
         </div>
       </div>
