@@ -15,9 +15,10 @@ const NeuralSettings = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const providers = [
+    { id: 'ml', name: 'ML Engine', sub: 'AST + CodeBERT', color: 'text-primary-container', desc: 'Real code understanding. AST parsing + neural inference.' },
     { id: 'gemini', name: 'Deep Neural', sub: 'Gemini 2.5', color: 'text-primary-container', desc: 'Slower, but high-reasoning arbitration.' },
-    { id: 'groq', name: 'Fast Neural', sub: 'Llama 3', color: 'text-secondary', desc: 'Lightning fast, high availability.' },
-    { id: 'local', name: 'Hard-Coded Logic', sub: 'RSA Engine', color: 'text-outline', desc: 'Deterministic analysis. No API required.' }
+    { id: 'groq', name: 'Fast Neural', sub: 'Grok / Llama', color: 'text-secondary', desc: 'Lightning fast, high availability.' },
+    { id: 'local', name: 'Hard-Coded Logic', sub: 'Regex Engine', color: 'text-outline', desc: 'Legacy deterministic. No API required.' }
   ];
 
   return (
@@ -49,7 +50,7 @@ const NeuralSettings = ({ isOpen, onClose }) => {
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-10 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 space-y-10 cc-panel-scroll">
             
             {/* Provider Selection */}
             <div className="space-y-4">
@@ -57,7 +58,7 @@ const NeuralSettings = ({ isOpen, onClose }) => {
                 <Settings size={14} />
                 <span className="text-[10px] font-mono uppercase tracking-[0.2em] font-bold text-on-surface/60">Select Neural Provider</span>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {providers.map((p) => (
                   <button
                     key={p.id}

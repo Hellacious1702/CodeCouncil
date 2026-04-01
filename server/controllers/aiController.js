@@ -1,6 +1,7 @@
 const geminiService = require('../services/geminiService');
 const groqService = require('../services/groqService');
 const rulesEngineService = require('../services/rulesEngineService');
+const mlService = require('../services/mlService');
 const CodeReview = require('../models/CodeReview');
 
 exports.reviewCode = async (req, res, next) => {
@@ -17,6 +18,9 @@ exports.reviewCode = async (req, res, next) => {
         switch (provider) {
             case 'groq':
                 service = groqService;
+                break;
+            case 'ml':
+                service = mlService;
                 break;
             case 'local':
                 service = rulesEngineService;
